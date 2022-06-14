@@ -1,4 +1,7 @@
 #include "queue.h"
+#include <stdio.h>
+
+// fprintf(stderr, ...)
 
 //------------------------------------------------------------------------------
 // Conta o numero de elementos na fila
@@ -51,6 +54,23 @@ void queue_print (char *name, queue_t *queue, void print_elem (void*) ) {
 // Retorno: 0 se sucesso, <0 se ocorreu algum erro
 
 int queue_append (queue_t **queue, queue_t *elem) {
+
+	// se fila não existe
+	if (*queue == NULL) {
+		fprintf(stderr, "Fila vazia");
+		return -1;
+	}
+
+	if (elem == NULL) {
+		fprint(stderr, "Elemento não existe");
+		return -2;
+	}
+
+	if ((elem->next == NULL) || (elem->prev == NULL)) {
+		fprint(stderr, "Elemento está em outra fila ou definido errado");
+		return -3;
+	}
+
 
 }
 
