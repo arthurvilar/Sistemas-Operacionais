@@ -1,7 +1,7 @@
+// GRR20197153 Arthur Hnerique Canello Vilar
+
 #include "queue.h"
 #include <stdio.h>
-
-// fprintf(stderr, ...)
 
 //------------------------------------------------------------------------------
 // Conta o numero de elementos na fila
@@ -35,13 +35,25 @@ int queue_size (queue_t *queue) {
 
 void queue_print (char *name, queue_t *queue, void print_elem (void*) ) {
 
-	queue_t *temp_queue = queue;
+	printf("%s: [", name);
+	
+	// Se a fila nao estiver vazia
+	if (queue) {
 
-	// Percorre a fila imprimindo os elementos até voltar para o começo
-	while (temp_queue->next != queue) {
+		queue_t *temp_queue = queue;
+		
+		// Percorre a fila imprimindo os elementos até voltar para o começo
+		while (temp_queue->next != queue) {
+			print_elem(temp_queue);
+			printf(" ");
+			temp_queue = temp_queue->next;
+		}
+
+		// Imprime o ultimo elemento
 		print_elem(temp_queue);
-		temp_queue = temp_queue->next;
 	}
+
+	printf("]\n");
 }
 
 
