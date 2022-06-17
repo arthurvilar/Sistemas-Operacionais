@@ -67,23 +67,40 @@ void queue_print (char *name, queue_t *queue, void print_elem (void*) ) {
 
 int queue_append (queue_t **queue, queue_t *elem) {
 
-	// se fila não existe
-	if (*queue == NULL) {
-		fprintf(stderr, "Fila vazia");
+	// checa se fila existe
+	if (queue == NULL) {
+		fprintf(stderr, "Fila não existe");
 		return -1;
 	}
 
+	// checa se elemento existe
 	if (elem == NULL) {
-		fprint(stderr, "Elemento não existe");
+		fprintf(stderr, "Elemento não existe");
 		return -2;
 	}
 
-	if ((elem->next == NULL) || (elem->prev == NULL)) {
-		fprint(stderr, "Elemento está em outra fila ou definido errado");
+	// checa se elemento nao esta em outra fila
+	if (elem->next || elem->prev) {
+		fprintf(stderr, "Elemento está em outra fila");
 		return -3;
 	}
 
+	// checa se a fila esta vazia
+	if (*queue == NULL) {
+		*queue = elem;
+		(*queue)->prev = (*queue)->next = *queue;
+		return 0;
+	}
 
+	// fila tem pelo menos um elemento
+	queue_t *temp_queue = (*queue)->prev;
+
+	(*queue)->prev = elem;
+	temp_queue->next = elem;
+	elem->next = *queue;
+	elem->prev = temp_queue;
+
+	return 0;
 }
 
 
@@ -98,4 +115,64 @@ int queue_append (queue_t **queue, queue_t *elem) {
 
 int queue_remove (queue_t **queue, queue_t *elem) {
 
+	// checa se fila existe
+	if (queue == NULL) {
+		fprintf(stderr, "Fila não existe");
+		return -1;
+	}
+
+	// checa se a fila esta vazia
+	if (*queue == NULL) {
+		fprintf(stderr, "Fila está vazia");
+		return -2;
+	}
+
+	// checa se elemento existe
+	if (elem == NULL) {
+		fprintf(stderr, "Elemento não existe");
+		return -3;
+	}
+
+	// checa se elemento esta na fila
+	queue_t *temp_queue = *queue;
+	queue_t *flag = NULL;
+
+	while (temp_queue->next != (*queue)) {
+		if (temp_queue == elem)
+			flag = temp_queue;
+		temp_queue = temp_queue->next;
+	}
+	
+	if (temp_queue == elem)	// ultimo elemento
+		flag = temp_queue;
+
+	if (!flag) {
+		fprintf(stderr, "Elemento não está na fila");
+		return -4;
+	}
+
+	// checa se o elemento rmovido é o primeiro
+	if (*queue == elem) {
+		// se a fila só tem um elemento
+		if (*queue == (*queue)->next)
+			*queue = NULL;
+
+		else {
+			(*queue)->next->prev = (*queue)->prev;
+			(*queue)->prev->next = (*queue)->next;
+			(*queue) = (*queue)->next;
+		}
+
+		elem->next = NULL;
+		elem->prev = NULL;
+
+		return 0;
+	}
+	
+	flag->next->prev = flag->prev;
+	flag->prev->next = flag->next;
+	elem->next = NULL;
+	elem->prev = NULL;
+
+	return 0;
 }
