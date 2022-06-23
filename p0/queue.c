@@ -67,22 +67,42 @@ void queue_print (char *name, queue_t *queue, void print_elem (void*) ) {
 
 int queue_append (queue_t **queue, queue_t *elem) {
 
+	queue_t *temp_queue;
+	
 	// checa se fila existe
 	if (queue == NULL) {
-		fprintf(stderr, "Fila não existe");
+		fprintf(stderr, "Fila não existe\n");
 		return -1;
 	}
 
 	// checa se elemento existe
 	if (elem == NULL) {
-		fprintf(stderr, "Elemento não existe");
+		fprintf(stderr, "Elemento não existe\n");
 		return -2;
 	}
 
-	// checa se elemento nao esta em outra fila
+	// checa se elemento pertence à uma fila
 	if (elem->next || elem->prev) {
-		fprintf(stderr, "Elemento está em outra fila");
-		return -3;
+
+		temp_queue = *queue;
+
+		// checa se elemento esta na fila
+		while (temp_queue->next != (*queue)) {
+			if (temp_queue == elem) {
+				fprintf(stderr, "Elemento já está na fila\n");
+				return -3;
+			}
+			temp_queue = temp_queue->next;
+		}
+		// confere último elemento
+		if (temp_queue == elem)	{ 
+			fprintf(stderr, "Elemento já está na fila\n");
+			return -3;
+		}
+
+		// se elem não está nessa fila significa que está em outra
+		fprintf(stderr, "Elemento está em outra fila\n");
+		return -4;
 	}
 
 	// checa se a fila esta vazia
@@ -93,7 +113,7 @@ int queue_append (queue_t **queue, queue_t *elem) {
 	}
 
 	// fila tem pelo menos um elemento
-	queue_t *temp_queue = (*queue)->prev;
+	temp_queue = (*queue)->prev;
 
 	(*queue)->prev = elem;
 	temp_queue->next = elem;
@@ -117,19 +137,19 @@ int queue_remove (queue_t **queue, queue_t *elem) {
 
 	// checa se fila existe
 	if (queue == NULL) {
-		fprintf(stderr, "Fila não existe");
+		fprintf(stderr, "Fila não existe\n");
 		return -1;
 	}
 
 	// checa se a fila esta vazia
 	if (*queue == NULL) {
-		fprintf(stderr, "Fila está vazia");
+		fprintf(stderr, "Fila está vazia\n");
 		return -2;
 	}
 
 	// checa se elemento existe
 	if (elem == NULL) {
-		fprintf(stderr, "Elemento não existe");
+		fprintf(stderr, "Elemento não existe\n");
 		return -3;
 	}
 
@@ -146,12 +166,15 @@ int queue_remove (queue_t **queue, queue_t *elem) {
 	if (temp_queue == elem)	// ultimo elemento
 		flag = temp_queue;
 
-	if (!flag) {
-		fprintf(stderr, "Elemento não está na fila");
+	if (!flag && !elem->next && !elem->prev) {
+		fprintf(stderr, "Elemento não está em nenhuma fila\n");
 		return -4;
+	} else if (!flag && (elem->next != NULL || elem->prev != NULL)) {
+		fprintf(stderr, "Elemento está em outra fila\n");
+		return -5;
 	}
 
-	// checa se o elemento rmovido é o primeiro
+	// checa se o elemento removido é o primeiro
 	if (*queue == elem) {
 		// se a fila só tem um elemento
 		if (*queue == (*queue)->next)
