@@ -1,4 +1,4 @@
-// GRR20197153 Arthur Hnerique Canello Vilar
+// GRR20197153 Arthur Henrique Canello Vilar
 
 #include "queue.h"
 #include <stdio.h>
@@ -14,7 +14,7 @@ int queue_size (queue_t *queue) {
 		return 0;
 	
 	int i = 1;
-	queue_t *temp_queue = queue;
+	queue_t *temp_queue = queue; // ponteiro temporario para percorrer a fila
 
 	// Percorre a fila contando os elementos até voltar para o começo
 	while (temp_queue->next != queue) {
@@ -94,7 +94,7 @@ int queue_append (queue_t **queue, queue_t *elem) {
 			}
 			temp_queue = temp_queue->next;
 		}
-		// confere último elemento
+		// confere último elemento (pois não passa pelo while)
 		if (temp_queue == elem)	{ 
 			fprintf(stderr, "Elemento já está na fila\n");
 			return -3;
@@ -112,7 +112,7 @@ int queue_append (queue_t **queue, queue_t *elem) {
 		return 0;
 	}
 
-	// fila tem pelo menos um elemento
+	// fila tem pelo menos um elemento, então insere
 	temp_queue = (*queue)->prev;
 
 	(*queue)->prev = elem;
@@ -153,19 +153,20 @@ int queue_remove (queue_t **queue, queue_t *elem) {
 		return -3;
 	}
 
-	// checa se elemento esta na fila
 	queue_t *temp_queue = *queue;
 	queue_t *flag = NULL;
 
+	// checa se elemento esta na fila
 	while (temp_queue->next != (*queue)) {
 		if (temp_queue == elem)
 			flag = temp_queue;
 		temp_queue = temp_queue->next;
 	}
-	
-	if (temp_queue == elem)	// ultimo elemento
+	// confere último elemento (pois não passa pelo while)
+	if (temp_queue == elem)	
 		flag = temp_queue;
 
+	// elemento não está na fila
 	if (!flag && !elem->next && !elem->prev) {
 		fprintf(stderr, "Elemento não está em nenhuma fila\n");
 		return -4;
