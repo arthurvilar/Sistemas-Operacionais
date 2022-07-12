@@ -5,7 +5,6 @@
 
 #define STACKSIZE 64*1024
 #define AGING_FACTOR -1
-#define DEBUG = true;
 
 /*------------------------------------------------VARIÁVEIS------------------------------------------------*/
 
@@ -73,7 +72,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->prioEst = task->prioDin = 0;
 
     #ifdef DEBUG
-        printf ("PPOS: task %d criou task %d\n", currTask->id, task->id);
+        printf ("PPOS: task %d criou task %d, tamanho da fila: %d\n", currTask->id, task->id, queue_size((queue_t *) readyTasks));
     #endif
     
     // se a tarefa for o dispatcher nao coloca na fila
@@ -83,11 +82,6 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     // coloca a tarefa na fila de prontos
     queue_append((queue_t **) &readyTasks, (queue_t *) task);
     userTasks++;
-
-    #ifdef DEBUG
-        printf ("PPOS: adicionou task %d na fila. Tamanho da fila: %d\n", task->id, queue_size((queue_t *) readyTasks));
-        printf ("PPOS: numero de tarefas prontas: %d\n", userTasks);
-    #endif
 
     return taskId;
 }
@@ -103,11 +97,11 @@ int task_switch (task_t *task) {
     currTask = task;
 
     #ifdef DEBUG
-        printf ("PPOS: trocando contexto task %d -> task %d\n", prevTask->id, task->id);
+        printf ("SWITCH: trocando contexto task %d -> task %d\n", prevTask->id, task->id);
     #endif
 
     // salva o contexto atual em prevTask e restaura o contexto salvo em task
-    if (swapcontext(&(prevTask->context), &(task->context)) == -1) {
+    if (swapcontext(&prevTask->context, &(task->context)) == -1) {
         fprintf(stderr, "Erro na troca de contexto\n");
         return -1;
     }
@@ -119,7 +113,7 @@ int task_switch (task_t *task) {
 void task_exit (int exit_code) {
 
     #ifdef DEBUG
-        printf("task_exit: tarefa %d sendo encerrada\n", currTask->id);
+        printf("PPOS: tarefa %d sendo encerrada\n", currTask->id);
     #endif
 
     currTask->status = 'T';
@@ -153,7 +147,7 @@ void task_setprio (task_t *task, int prio) {
 
     // cuidar do cado de prioridade maxima (-20) e minima (20)
     if (!task) 
-        task = currTask;
+        currTask->prioEst = currTask->prioDin = prio;
     
     task->prioEst = task->prioDin = prio;
     
@@ -166,10 +160,11 @@ void task_setprio (task_t *task, int prio) {
 int task_getprio (task_t *task) {
 
     #ifdef DEBUG
-        printf ("PPOS: prioridade da task %d -> estatica %d, dinamica %d\n", task->id, task->prioEst, task->prioDin);
+        if (task != NULL)
+            printf ("PPOS: prioridade da task %d -> estatica %d, dinamica %d\n", task->id, task->prioEst, task->prioDin);
     #endif
 
-    if (!task)
+    if (task != NULL)
         return task->prioEst;
 
     return currTask->prioEst;
@@ -199,14 +194,6 @@ static task_t *scheduler () {
     }
 
     maiorPrio->prioDin = maiorPrio->prioEst;
-
-    #ifdef DEBUG
-    temp = readyTasks;
-    while (temp->next != readyTasks) {
-        printf ("SCHEDULER: prio da task %d: %d\n", temp->id, temp->prioDin);
-        temp = temp->next;
-    }
-    #endif
 
     return maiorPrio;
 }

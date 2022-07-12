@@ -1,5 +1,5 @@
 CC     = gcc
-CFLAGS = -Wall
+CFLAGS = -Wall -g
 
 PROG = teste
 OBJS = ppos_core.o queue.o
