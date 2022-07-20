@@ -1,3 +1,5 @@
+// GRR20197153 Arthur Henrique Canello Vilar
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "queue.h" 
@@ -116,8 +118,10 @@ void task_exit (int exit_code) {
         printf("PPOS: tarefa %d sendo encerrada\n", currTask->id);
     #endif
 
+    // seta tarefa no status terminada
     currTask->status = 'T';
 
+    // decide se volta para o dispatcher ou para a main
     if (currTask == &dispatcherTask) 
         task_switch(&mainTask);
     else
@@ -145,7 +149,7 @@ void task_yield () {
 // define a prioridade estática de uma tarefa (ou a tarefa atual)
 void task_setprio (task_t *task, int prio) {
 
-    // cuidar do cado de prioridade maxima (-20) e minima (20)
+    // cuidar do caso de prioridade maxima (-20) e minima (20)
     if (!task) 
         currTask->prioEst = currTask->prioDin = prio;
     
@@ -173,19 +177,20 @@ int task_getprio (task_t *task) {
 // retorna ponterio pra proxima tarefa da fila a ser executada
 static task_t *scheduler () {
 
-    // percorrer a fila procurando a task de maior prioridade
-    task_t *temp = readyTasks;
-    task_t *maiorPrio = temp;
+    task_t *temp = readyTasks;  // temp no inicio da fila
+    task_t *maiorPrio = temp;   // salva a task de maior prioridade (menor valor)
 
     if(!temp)
         return NULL;
 
+    // percorre a fila procurando a task de maior prioridade
     while ((temp = temp->next) != readyTasks) {
     
         #ifdef DEBUG
             printf ("SCHEDULER: comparando task %d com %d, maiorPrio: %d, tempPrio: %d\n", maiorPrio->id, temp->id, maiorPrio->prioDin, temp->prioDin);
         #endif
     
+        // faz o envelhecimento da task
         if (maiorPrio->prioDin > temp->prioDin) {
             maiorPrio->prioDin += AGING_FACTOR;
             maiorPrio = temp;
@@ -203,9 +208,14 @@ static void dispatcher () {
 
     task_t *proxima;
 
+    // enquanto existir pelo menos uma task
     while (userTasks > 0) {
+        // pega task do scheduler
         proxima = scheduler();
 
+        /* remove tarefa da fila e a executa, se estiver com status de pronta 
+         * coloca de novo na fila, se estiver com status de terminada diminui
+         * o contador de tasks  */
         if (proxima != NULL) {
             proxima->status = 'E';
             queue_remove((queue_t **) &readyTasks, (queue_t *) proxima);
