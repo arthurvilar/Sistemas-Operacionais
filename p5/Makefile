@@ -1,7 +1,7 @@
 CC     = gcc
 CFLAGS = -Wall -g
 
-PROG = teste
+PROG = pingpong-preempcao pingpong-preempcao-stress
 OBJS = ppos_core.o queue.o
 
 .PHONY: clean purge all
@@ -17,5 +17,5 @@ $(PROG) : % :  $(OBJS) %.o
 clean:
 	@rm -f *.o
 
-purge:   
+purge: clean
 	@rm -f $(PROG)
