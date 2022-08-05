@@ -26,11 +26,13 @@ int taskId = 0;     // id da tarefa
 int userTasks = 0;  // incrementar quando criar uma tarefa e decrementar quando acabar uma tarefa
 task_t *currTask, *prevTask, *readyTasks, mainTask, dispatcherTask;
 unsigned int totalTicks, processorTime;
+/*----------------------------------------------------------------------------------------------------------*/
 
 
 /*--------------------------------------------DECLARAÇÃO STRUCTS--------------------------------------------*/
 struct sigaction action;    // estrutura que define um tratador de sinal
 struct itimerval timer;     // estrutura de inicialização to timer
+/*----------------------------------------------------------------------------------------------------------*/
 
 
 /*--------------------------------------------DECLARAÇÃO FUNÇÕES--------------------------------------------*/
@@ -38,6 +40,7 @@ static void dispatcher ();      // função dispatcher
 static void set_timer ();       // inicia o timer
 static void time_handler ();    // trata os ticks do timer
 unsigned int systime ();        // retorna o num dew ticks desde o inicio
+/*----------------------------------------------------------------------------------------------------------*/
 
 
 /*-------------------------------------------------FUNÇÕES--------------------------------------------------*/
@@ -66,6 +69,7 @@ void ppos_init () {
     set_timer();
 }
 
+
 static void set_timer() {
 
     // registra a ação para o sinal de timer SIGALRM
@@ -90,6 +94,7 @@ static void set_timer() {
     }
 }
 
+
 static void time_handler() {
     
     totalTicks++;
@@ -104,6 +109,7 @@ static void time_handler() {
 
     return;
 }
+
 
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro.
 int task_create (task_t *task, void (*start_func)(void *), void *arg) {
@@ -158,6 +164,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     return taskId;
 }
 
+
 // alterna a execução para a tarefa indicada
 int task_switch (task_t *task) {
 
@@ -181,14 +188,21 @@ int task_switch (task_t *task) {
     return 0;
 }
 
+
 // Termina a tarefa corrente, indicando um valor de status encerramento
 void task_exit (int exit_code) {
 
     // seta tarefa no status terminada
     currTask->status = 'T';
+    currTask->exitCode = exit_code;
 
-    currTask->executionTime = systime() - currTask->executionTime; // aqui
+    currTask->executionTime = systime() - currTask->executionTime; 
     printf("Task %d exit: execution time %d ms, processor time %d ms, %d activations\n", currTask->id, currTask->executionTime, currTask->processorTime, currTask->activations);
+
+    task_t *temp = currTask->suspendedQueue;
+    while ((temp = temp->next) != currTask->suspendedQueue) 
+        task_resume(temp, currTask->suspendedQueue);
+    task_resume(currTask, currTask->suspendedQueue);
 
     // decide se volta para o dispatcher ou para a main
     if (currTask == &dispatcherTask) 
@@ -200,11 +214,13 @@ void task_exit (int exit_code) {
 
 }
 
+
 // retorna o identificador da tarefa corrente (main deve ser 0)
 int task_id () {
 
     return currTask->id;
 }
+
 
 // libera o processador para a próxima tarefa, retornando à fila de tarefas
 // prontas ("ready queue"), devolve o processador pro dispatcher task switch
@@ -212,6 +228,7 @@ void task_yield () {
 
     task_switch(&dispatcherTask);
 }
+
 
 // define a prioridade estática de uma tarefa (ou a tarefa atual)
 void task_setprio (task_t *task, int prio) {
@@ -222,6 +239,7 @@ void task_setprio (task_t *task, int prio) {
     task->prioEst = task->prioDin = prio;
 }
 
+
 // retorna a prioridade estática de uma tarefa (ou a tarefa atual)
 int task_getprio (task_t *task) {
 
@@ -230,6 +248,56 @@ int task_getprio (task_t *task) {
 
     return currTask->prioEst;
 }
+
+
+// suspende a tarefa atual na fila "queue"
+void task_suspend (task_t **queue) {
+
+    task_t *temp = readyTasks;
+
+    // se currTask esta em readyTasks retirar
+    if (temp != currTask)
+        while ((temp = temp->next) != readyTasks) 
+            if (currTask == temp) 
+                queue_remove((queue_t **) &readyTasks, (queue_t *) currTask);
+    else 
+        queue_remove((queue_t **) &readyTasks, (queue_t *) currTask);
+
+    currTask->status = 'S'; // S = suspensa
+
+    queue_append((queue_t **) queue, (queue_t *) currTask);
+}
+
+
+// acorda a tarefa indicada, que está suspensa na fila indicada
+void task_resume (task_t *task, task_t **queue) {
+
+    task_t *temp = *queue;
+
+        
+    if (temp != currTask) 
+        while ((temp = temp->next) != *queue) 
+            if (temp == task) 
+                queue_remove((queue_t **) queue, (queue_t *) task);
+    else 
+        queue_remove((queue_t **) queue, (queue_t *) task);
+
+    task->status = 'P';
+    queue_append((queue_t **) &readyTasks, (queue_t *) task);
+}
+
+// a tarefa corrente aguarda o encerramento de outra task
+int task_join (task_t *task) {
+    if ((task->status == 'T') || (task == NULL))
+        return -1; 
+
+    task_suspend(&task->suspendedQueue);
+    task->suspendedCount++;
+    task_yield();
+    
+    return task->exitCode; 
+}
+
 
 // retorna ponterio pra proxima tarefa da fila a ser executada
 static task_t *scheduler () {
@@ -256,6 +324,7 @@ static task_t *scheduler () {
     return maiorPrio;
 }
 
+
 // se fila de prontos estiver vazia o dispatcher encerra
 static void dispatcher () {
 
@@ -269,9 +338,6 @@ static void dispatcher () {
         // pega task do scheduler
         proxima = scheduler();
 
-        /* remove tarefa da fila e a executa, se estiver com status de pronta 
-         * coloca de novo na fila, se estiver com status de terminada diminui
-         * o contador de tasks  */
         if (proxima != NULL) {
             
             proxima->status = 'E';
@@ -286,6 +352,7 @@ static void dispatcher () {
 
                 // se terminada da free
                 case 'T':
+                    task_resume(proxima, proxima->suspendedQueue);
                     queue_remove((queue_t **) &readyTasks, (queue_t *) proxima);
                     free(proxima->context.uc_stack.ss_sp);
                     break;
@@ -296,47 +363,13 @@ static void dispatcher () {
     task_exit(0);
 }
 
+
+// retorna tempo atual
 unsigned int systime() {
     return totalTicks;
 }
 
-// suspende a tarefa atual na fila "queue"
-void task_suspend (task_t **queue) {
 
-    task_t *temp = readyTasks;
 
-    // se currTask esta em readyTasks retirar
-    if (temp != currTask) {
-        while ((temp = temp->next) != readyTasks) {
-            if (currTask == temp) {
-                queue_remove((queue_t **) &readyTasks, (queue_t *) currTask);
-            }
-        }
-    } else {
-        queue_remove((queue_t **) &readyTasks, (queue_t *) currTask);
-    }
 
-    currTask->status = 'S'; // S = suspensa
-
-    queue_append((queue_t **) *queue, (queue_t *) currTask);
-}
-
-// acorda a tarefa indicada, que está suspensa na fila indicada
-void task_resume (task_t *task, task_t **queue) {
-
-}
-
-// a tarefa corrente aguarda o encerramento de outra task
-int task_join (task_t *task) {
-    if ((task->taskState == 'T') || (task == NULL))
-        return -1; 
-
-    task_suspend(&task->suspendedQueue);
-    task->suspendedCount++;
-    task_yield();
-    
-    return task->exitCode; 
-    
-    /* queue_append((queue_t **) &task->suspendedQueue, (queue_t *) task);
-    task->suspendedCount++; */
-}
+/*----------------------------------------------------------------------------------------------------------*/
