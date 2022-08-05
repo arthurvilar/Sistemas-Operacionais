@@ -199,10 +199,12 @@ void task_exit (int exit_code) {
     currTask->executionTime = systime() - currTask->executionTime; 
     printf("Task %d exit: execution time %d ms, processor time %d ms, %d activations\n", currTask->id, currTask->executionTime, currTask->processorTime, currTask->activations);
 
-    task_t *temp = currTask->suspendedQueue;
-    while ((temp = temp->next) != currTask->suspendedQueue) 
-        task_resume(temp, currTask->suspendedQueue);
-    task_resume(currTask, currTask->suspendedQueue);
+    // task_t *temp = currTask->suspendedQueue;
+    // while ((temp = temp->next) != currTask->suspendedQueue) 
+    //     task_resume(temp, currTask->suspendedQueue);
+    // task_resume(currTask, currTask->suspendedQueue);
+    while (currTask->suspendedQueue)
+        task_resume((task_t *) currTask->suspendedQueue, (task_t **) &currTask->suspendedQueue);
 
     // decide se volta para o dispatcher ou para a main
     if (currTask == &dispatcherTask) 
@@ -253,35 +255,18 @@ int task_getprio (task_t *task) {
 // suspende a tarefa atual na fila "queue"
 void task_suspend (task_t **queue) {
 
-    task_t *temp = readyTasks;
-
-    // se currTask esta em readyTasks retirar
-    if (temp != currTask)
-        while ((temp = temp->next) != readyTasks) 
-            if (currTask == temp) 
-                queue_remove((queue_t **) &readyTasks, (queue_t *) currTask);
-    else 
-        queue_remove((queue_t **) &readyTasks, (queue_t *) currTask);
-
+    queue_remove((queue_t **) &readyTasks, (queue_t *) currTask);
     currTask->status = 'S'; // S = suspensa
-
     queue_append((queue_t **) queue, (queue_t *) currTask);
+
+    task_yield();
 }
 
 
 // acorda a tarefa indicada, que está suspensa na fila indicada
 void task_resume (task_t *task, task_t **queue) {
 
-    task_t *temp = *queue;
-
-        
-    if (temp != currTask) 
-        while ((temp = temp->next) != *queue) 
-            if (temp == task) 
-                queue_remove((queue_t **) queue, (queue_t *) task);
-    else 
-        queue_remove((queue_t **) queue, (queue_t *) task);
-
+    queue_remove((queue_t **) queue, (queue_t *) task);
     task->status = 'P';
     queue_append((queue_t **) &readyTasks, (queue_t *) task);
 }
@@ -291,9 +276,8 @@ int task_join (task_t *task) {
     if ((task->status == 'T') || (task == NULL))
         return -1; 
 
-    task_suspend(&task->suspendedQueue);
+    task_suspend((task_t **) &task->suspendedQueue);
     task->suspendedCount++;
-    task_yield();
     
     return task->exitCode; 
 }
@@ -352,7 +336,7 @@ static void dispatcher () {
 
                 // se terminada da free
                 case 'T':
-                    task_resume(proxima, proxima->suspendedQueue);
+                    task_resume(proxima, &proxima->suspendedQueue);
                     queue_remove((queue_t **) &readyTasks, (queue_t *) proxima);
                     free(proxima->context.uc_stack.ss_sp);
                     break;
