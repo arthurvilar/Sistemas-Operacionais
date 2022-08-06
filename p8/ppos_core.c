@@ -12,14 +12,6 @@
 #define QUANTUM 1           // ticks por quantum
 //#define DEBUG
 
-/* TO DO
- * Dentro do struct da tarefa x criar um ponteiro para todas as 
- * tarefas que estao esperando x terminar.
- * Fila de tarefas suspensar esperando a tarefa indicada no struct encerrar.
- * Quando a tarefa encerra varrer a fila e acordar as tarefas que estavam esperando.
- * Fazer a varredura no exit ou no dispatcher. 
- * */
-
 
 /*--------------------------------------------VARIÁVEIS GLOBAIS---------------------------------------------*/
 int taskId = 0;     // id da tarefa
@@ -39,7 +31,6 @@ struct itimerval timer;     // estrutura de inicialização to timer
 static void dispatcher ();      // função dispatcher
 static void set_timer ();       // inicia o timer
 static void time_handler ();    // trata os ticks do timer
-unsigned int systime ();        // retorna o num dew ticks desde o inicio
 /*----------------------------------------------------------------------------------------------------------*/
 
 
@@ -58,6 +49,7 @@ void ppos_init () {
     mainTask.prioEst = mainTask.prioDin = 0;
     mainTask.preemptable = 'Y'; // preemptavel
     mainTask.suspendedQueue = NULL;
+    mainTask.suspendedCount = 0;
     queue_append ((queue_t **) &readyTasks, (queue_t *) &mainTask);
 
     userTasks++;
@@ -108,6 +100,12 @@ static void time_handler() {
     }
 
     return;
+}
+
+
+// retorna tempo atual
+unsigned int systime() {
+    return totalTicks;
 }
 
 
@@ -189,34 +187,6 @@ int task_switch (task_t *task) {
 }
 
 
-// Termina a tarefa corrente, indicando um valor de status encerramento
-void task_exit (int exit_code) {
-
-    // seta tarefa no status terminada
-    currTask->status = 'T';
-    currTask->exitCode = exit_code;
-
-    currTask->executionTime = systime() - currTask->executionTime; 
-    printf("Task %d exit: execution time %d ms, processor time %d ms, %d activations\n", currTask->id, currTask->executionTime, currTask->processorTime, currTask->activations);
-
-    // task_t *temp = currTask->suspendedQueue;
-    // while ((temp = temp->next) != currTask->suspendedQueue) 
-    //     task_resume(temp, currTask->suspendedQueue);
-    // task_resume(currTask, currTask->suspendedQueue);
-    while (currTask->suspendedQueue)
-        task_resume((task_t *) currTask->suspendedQueue, (task_t **) &currTask->suspendedQueue);
-
-    // decide se volta para o dispatcher ou para a main
-    if (currTask == &dispatcherTask) 
-        task_switch(&mainTask);
-    else {
-        userTasks--;
-        task_switch(&dispatcherTask);
-    }
-
-}
-
-
 // retorna o identificador da tarefa corrente (main deve ser 0)
 int task_id () {
 
@@ -255,8 +225,16 @@ int task_getprio (task_t *task) {
 // suspende a tarefa atual na fila "queue"
 void task_suspend (task_t **queue) {
 
+    #ifdef DEBUG
+        printf("TASK_SUSPEND: remove task %d da readyTasks\nTASK_SUSPEND: tamanho da readyTasks antes = %d\n", currTask->id, queue_size((queue_t *)readyTasks));
+    #endif
     queue_remove((queue_t **) &readyTasks, (queue_t *) currTask);
+    #ifdef DEBUG
+        printf("TASK_SUSPEND: tamanho da readyTasks depois = %d\n", queue_size((queue_t *)readyTasks));
+    #endif
+
     currTask->status = 'S'; // S = suspensa
+
     queue_append((queue_t **) queue, (queue_t *) currTask);
 
     task_yield();
@@ -266,20 +244,56 @@ void task_suspend (task_t **queue) {
 // acorda a tarefa indicada, que está suspensa na fila indicada
 void task_resume (task_t *task, task_t **queue) {
 
+    #ifdef DEBUG
+        printf("TASK_RESUME: remove task %d da suspended\n", task->id);
+    #endif
     queue_remove((queue_t **) queue, (queue_t *) task);
+
     task->status = 'P';
+
+    #ifdef DEBUG
+        printf("TASK_RESUME: appen task %d na readyTasks\n", task->id);
+    #endif
     queue_append((queue_t **) &readyTasks, (queue_t *) task);
 }
 
+
 // a tarefa corrente aguarda o encerramento de outra task
 int task_join (task_t *task) {
+
     if ((task->status == 'T') || (task == NULL))
         return -1; 
 
-    task_suspend((task_t **) &task->suspendedQueue);
     task->suspendedCount++;
+    task_suspend((task_t **) &task->suspendedQueue);
     
     return task->exitCode; 
+}
+
+
+// Termina a tarefa corrente, indicando um valor de status encerramento
+void task_exit (int exit_code) {
+
+    // seta tarefa no status terminada
+    currTask->status = 'T';
+    currTask->exitCode = exit_code;
+
+    currTask->executionTime = systime() - currTask->executionTime; 
+    printf("Task %d exit: execution time %d ms, processor time %d ms, %d activations\n", currTask->id, currTask->executionTime, currTask->processorTime, currTask->activations);
+
+    while (currTask->suspendedCount > 0) {
+        task_resume((task_t *) currTask->suspendedQueue, (task_t **) &currTask->suspendedQueue);
+        currTask->suspendedCount--;
+    }
+
+    // decide se volta para o dispatcher ou para a main
+    if (currTask == &dispatcherTask) 
+        task_switch(&mainTask);
+    else {
+        userTasks--;
+        task_switch(&dispatcherTask);
+    }
+
 }
 
 
@@ -336,7 +350,6 @@ static void dispatcher () {
 
                 // se terminada da free
                 case 'T':
-                    task_resume(proxima, &proxima->suspendedQueue);
                     queue_remove((queue_t **) &readyTasks, (queue_t *) proxima);
                     free(proxima->context.uc_stack.ss_sp);
                     break;
@@ -346,14 +359,6 @@ static void dispatcher () {
 
     task_exit(0);
 }
-
-
-// retorna tempo atual
-unsigned int systime() {
-    return totalTicks;
-}
-
-
 
 
 /*----------------------------------------------------------------------------------------------------------*/
