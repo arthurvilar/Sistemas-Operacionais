@@ -360,8 +360,6 @@ static void dispatcher () {
 
     // enquanto existir pelo menos uma task
     while (userTasks > 0) {
-        
-        //dispatcherTask.activations++;
 
         wakeup_tasks();
 
@@ -372,7 +370,6 @@ static void dispatcher () {
             
             proxima->status = 'E';
             proxima->quantum = 20;
-            //proxima->activations++;
 
             processorTime = systime();
             task_switch(proxima);
