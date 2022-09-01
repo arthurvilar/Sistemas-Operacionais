@@ -79,15 +79,15 @@ static void set_timer() {
     }
 
     // ajusta valores do temporizador
-    timer.it_value.tv_usec = 1000 ;      // primeiro disparo, em micro-segundos
-    timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
-    timer.it_interval.tv_usec = 1000 ;   // disparos subsequentes, em micro-segundos
-    timer.it_interval.tv_sec  = 0 ;   // disparos subsequentes, em segundos
+    timer.it_value.tv_usec = 1000;      // primeiro disparo, em micro-segundos
+    timer.it_value.tv_sec  = 0;      // primeiro disparo, em segundos
+    timer.it_interval.tv_usec = 1000;   // disparos subsequentes, em micro-segundos
+    timer.it_interval.tv_sec  = 0;   // disparos subsequentes, em segundos
 
     // arma o temporizador ITIMER_REAL (vide man setitimer)
     if (setitimer (ITIMER_REAL, &timer, 0) < 0) {
-        perror ("Erro em setitimer: ") ;
-        exit (1) ;
+        perror ("Erro em setitimer: ");
+        exit (1);
     }
 }
 
@@ -409,11 +409,11 @@ void task_sleep (int t) {
 
 static void enter_cs (int *lock) {
   // atomic OR (Intel macro for GCC)
-  while (__sync_fetch_and_or (lock, 1)) ;   // busy waiting
+  while (__sync_fetch_and_or (lock, 1));   // busy waiting
 }
  
 static void leave_cs (int *lock) {
-  (*lock) = 0 ;
+  (*lock) = 0;
 }
 
 
@@ -486,7 +486,7 @@ int sem_destroy (semaphore_t *s) {
         sem_up(s);
     }
 
-    s = NULL;
+    //s = NULL;
 
     return 0;
 }
@@ -495,11 +495,13 @@ int sem_destroy (semaphore_t *s) {
 // cria uma fila para até max mensagens de size bytes cada
 int mqueue_create (mqueue_t *queue, int max, int size) {
 
+    // inicia o buffer
     queue->buffer = malloc(max * size);
 
     if (!queue->buffer)
         return -1;
 
+    // seta as variaveis de queue
     queue->max_size = max;
     queue->msg_size = size;
     queue->num_msgs = 0;
@@ -507,6 +509,7 @@ int mqueue_create (mqueue_t *queue, int max, int size) {
     queue->start = 0;
     queue->end = 0;
 
+    // cria os semaforos
     if (sem_create(&queue->s_vaga, max))
         return -1;
     if (sem_create(&queue->s_item, 0))
@@ -527,7 +530,9 @@ int mqueue_send (mqueue_t *queue, void *msg) {
     sem_down(&queue->s_vaga);
     sem_down(&queue->s_buffer);
 
-    memcpy(queue->buffer + (queue->end * queue->msg_size), msg, queue->msg_size);
+    // insere na fila
+    void *dest = queue->buffer + (queue->end * queue->msg_size);
+    memcpy(dest, msg, queue->msg_size);
     queue->end = (queue->end + 1) % queue->max_size;
     queue->num_msgs ++;
 
@@ -547,7 +552,9 @@ int mqueue_recv (mqueue_t *queue, void *msg) {
     sem_down(&queue->s_item);
     sem_down(&queue->s_buffer);
 
-    memcpy(msg, queue->buffer + (queue->start * queue->msg_size), queue->msg_size);
+    //remove da fila
+    void *src = queue->buffer + (queue->start * queue->msg_size);
+    memcpy(msg, src, queue->msg_size);
     queue->start = (queue->start + 1) % queue->max_size;
     queue->num_msgs --;
 
@@ -564,6 +571,7 @@ int mqueue_destroy (mqueue_t *queue) {
     if (!queue || !queue->valid)
         return -1;
 
+    // destroi os semaforos
     if (sem_destroy(&queue->s_vaga))
         return -1;
     if (sem_destroy(&queue->s_item))
@@ -571,6 +579,7 @@ int mqueue_destroy (mqueue_t *queue) {
     if (sem_destroy(&queue->s_buffer))
         return -1;
 
+    // libera o buffer
     queue->valid = 0;
     if (queue->buffer)
         free(queue->buffer);

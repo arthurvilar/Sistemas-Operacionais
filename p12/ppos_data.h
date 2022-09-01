@@ -12,14 +12,14 @@
 // Estrutura que define um Task Control Block (TCB)
 typedef struct task_t
 {
-    struct task_t *prev, *next ;    // ponteiros para usar em filas
-    int id ;				        // identificador da tarefa
+    struct task_t *prev, *next;    // ponteiros para usar em filas
+    int id;				        // identificador da tarefa
     int prioEst;                    // prioridade estatica da tarefa
     int prioDin;                    // prioridade dinamica da tarefa
     int quantum;                    // tempo de processador da tarefa
-    ucontext_t context ;			// contexto armazenado da tarefa
-    short status ;			        // pronta, rodando, suspensa, ...
-    short preemptable ;			    // pode ser preemptada? 'Y' ou 'N'
+    ucontext_t context;			// contexto armazenado da tarefa
+    short status;			        // pronta, rodando, suspensa, ...
+    short preemptable;			    // pode ser preemptada? 'Y' ou 'N'
     unsigned int executionTime;     // tempo total da tarefa
     unsigned int processorTime;     // tempo que a tarefa ficou em processador
     int activations;                // numero de ativações da tarefa
@@ -27,7 +27,7 @@ typedef struct task_t
     int suspendedCount;             // numero de tarefas na fila suspendedQueue
     struct task_t *suspendedQueue;  // fila de tarefas suspensas
     int wakeTime;                   // tempo que a tarefa deve acordar
-} task_t ;
+} task_t;
 
 // estrutura que define um semáforo
 typedef struct
@@ -35,19 +35,19 @@ typedef struct
     int value;
     task_t *semQueue;
     int lock;
-} semaphore_t ;
+} semaphore_t;
 
 // estrutura que define um mutex
 typedef struct
 {
     // preencher quando necessário
-} mutex_t ;
+} mutex_t;
 
 // estrutura que define uma barreira
 typedef struct
 {
     // preencher quando necessário
-} barrier_t ;
+} barrier_t;
 
 // estrutura que define uma fila de mensagens
 typedef struct
@@ -62,6 +62,6 @@ typedef struct
     semaphore_t s_vaga;
     semaphore_t s_item;
     semaphore_t s_buffer;
-} mqueue_t ;
+} mqueue_t;
 
 #endif
