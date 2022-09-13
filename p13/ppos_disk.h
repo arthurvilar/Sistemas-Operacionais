@@ -18,7 +18,7 @@ typedef struct  {
   struct request_t *prev, *next;
   void *buffer;
   int block;
-  int op;
+  short op;
   task_t *task;
 
 } request_t;

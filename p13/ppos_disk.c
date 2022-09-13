@@ -16,7 +16,7 @@ extern task_t *currTask;
 extern task_t *readyTasks;
 
 
-static void diskDriverBody(void *args) {
+static void diskDriverBody() {
 
     request_t *req;
 
@@ -25,11 +25,10 @@ static void diskDriverBody(void *args) {
         sem_down(&disk.disk_access);
     
         // se foi acordado devido a um sinal do disco
-        if (disk.sinal == 1) {
+        if (disk.sinal) {
             // acorda a tarefa cujo pedido foi atendido
             task_resume((task_t *) req->task, (task_t**) &disk.suspended_queue);
             queue_remove((queue_t **) &disk.suspended_queue, (queue_t *) req);
-            free(req);
             disk.sinal = 0;
         }
     
@@ -41,15 +40,15 @@ static void diskDriverBody(void *args) {
             // solicita ao disco a operação de E/S, usando disk_cmd()
             if (req->op == 1) 
                 disk_cmd(DISK_CMD_READ, req->block, req->buffer);
-            else if (req->op == 1)
+            else if (req->op == 2)
                 disk_cmd(DISK_CMD_WRITE, req->block, req->buffer);
         }
 
-        queue_remove((queue_t **) &readyTasks, (queue_t *) &disk_manager_task);
-        disk_manager_task.status = 'S';
-
         // libera o semáforo de acesso ao disco
         sem_up(&disk.disk_access);
+
+        queue_remove((queue_t **) &readyTasks, (queue_t *) &disk_manager_task);
+        disk_manager_task.status = 'S';
 
         // suspende a tarefa corrente (retorna ao dispatcher)
         task_yield();
@@ -96,6 +95,15 @@ int disk_mgr_init (int *numBlocks, int *blockSize) {
     if (*numBlocks < 0 || *blockSize < 0) 
         return -1;
 
+    sem_create(&disk.disk_access, 1);
+    disk.sinal = 0;
+    disk.request_queue = NULL;
+    disk.suspended_queue = NULL;
+
+    task_create(&disk_manager_task, diskDriverBody, NULL);
+    queue_remove((queue_t **) &readyTasks, (queue_t *) &disk_manager_task);
+    disk_manager_task.status = 'S';
+
     // registra o sinal de SIGUSR1
     action.sa_handler = sigusr_handler;
     sigemptyset(&action.sa_mask);
@@ -104,22 +112,15 @@ int disk_mgr_init (int *numBlocks, int *blockSize) {
         perror("Sigaction error!");
         exit(1);
     }
-
-    sem_create(&disk.disk_access, 1);
-    disk.sinal = 0;
-    // disk.request_queue = NULL;
-    // disk.suspended_queue = NULL;
-
-
-    task_create(&disk_manager_task, diskDriverBody, NULL);
-    queue_remove((queue_t **) &readyTasks, (queue_t *) &disk_manager_task);
-    disk_manager_task.status = 'S';
     
     return 0;
 }
 
 // leitura de um bloco, do disco para o buffer
 int disk_block_read (int block, void *buffer) {
+
+    if (!buffer)
+        return -1;
 
     // obtém o semáforo de acesso ao disco
     sem_down(&disk.disk_access);    
@@ -154,6 +155,9 @@ int disk_block_read (int block, void *buffer) {
 // escrita de um bloco, do buffer para o disco
 int disk_block_write (int block, void *buffer) {
     
+    if (!buffer)
+        return -1;
+
     // obtém o semáforo de acesso ao disco
     sem_down(&disk.disk_access);    
     

@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <string.h>
 #include <sys/time.h>
+#include "variaveis_globais.h"
 #include "ppos_disk.h"
 #include "queue.h" 
 #include "ppos.h"
@@ -21,6 +22,7 @@ int userTasks = 0;  // incrementar quando criar uma tarefa e decrementar quando 
 task_t *currTask, *prevTask, *readyTasks, *suspendedTasks, mainTask, dispatcherTask;
 unsigned int totalTicks, processorTime;
 extern task_t disk_manager_task;
+int numBlocks, blockSize;
 /*----------------------------------------------------------------------------------------------------------*/
 
 
@@ -159,7 +161,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->wakeTime = 0;
     
     // se a tarefa for o dispatcher nao coloca na fila
-    if ((task != &dispatcherTask) && (task != &disk_manager_task)) {
+    if ((task == &dispatcherTask) || (task == &disk_manager_task)) {
         task->preemptable = 'N';
         return taskId;
     }
@@ -392,7 +394,7 @@ static void dispatcher () {
         }
     }
 
-    task_exit(0);
+    task_exit(dispatcherTask.id);
 }
 
 
@@ -428,6 +430,7 @@ int sem_create (semaphore_t *s, int value) {
     s->semQueue = NULL;
     s->value = value;
     s->lock = 0;
+    s->valid = 1;
 
     return 0;
 }
@@ -439,7 +442,7 @@ int sem_down (semaphore_t *s) {
     // se nao, continua na tarefa e decrementa o valor do semaforo
     // retorna 0 em caso de sucesso ou -1 em caso de erro (semáforo não existe ou foi destruído)
 
-    if (!s)
+    if (!s || !s->valid)
         return -1;
 
     enter_cs(&s->lock);
@@ -462,7 +465,7 @@ int sem_up (semaphore_t *s) {
     // incrementa o valor do semaforo e libera a primeira task da fila se houver
     // retorna 0 em caso de sucesso ou -1 em caso de erro (semáforo não existe ou foi destruído)
 
-    if (!s)
+    if (!s || !s->valid)
         return -1;
         
     enter_cs(&s->lock);
@@ -484,11 +487,17 @@ int sem_destroy (semaphore_t *s) {
     // destrói o semáforo apontado por s, acordando todas as tarefas que aguardavam por ele
     // e retornar da operação Down correspondente com um código de erro (valor de retorno -1)
 
-    while (s->value <= 0) {
-        sem_up(s);
+    if (!s || !s->valid)
+        return -1;
+
+    task_t *itr;
+
+    while ((itr = s->semQueue)) {
+        queue_remove((queue_t **) &s->semQueue, (queue_t*) itr);
+        queue_append((queue_t **) &readyTasks, (queue_t*) itr);
     }
 
-    //s = NULL;
+    s->valid = 0;
 
     return 0;
 }
@@ -585,6 +594,8 @@ int mqueue_destroy (mqueue_t *queue) {
     queue->valid = 0;
     if (queue->buffer)
         free(queue->buffer);
+
+    queue->buffer = NULL;
 
     return 0;
 }
