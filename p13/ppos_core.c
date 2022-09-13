@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <string.h>
 #include <sys/time.h>
+#include "ppos_disk.h"
 #include "queue.h" 
 #include "ppos.h"
 
@@ -19,6 +20,7 @@ int taskId = 0;     // id da tarefa
 int userTasks = 0;  // incrementar quando criar uma tarefa e decrementar quando acabar uma tarefa
 task_t *currTask, *prevTask, *readyTasks, *suspendedTasks, mainTask, dispatcherTask;
 unsigned int totalTicks, processorTime;
+extern task_t disk_manager_task;
 /*----------------------------------------------------------------------------------------------------------*/
 
 
@@ -157,7 +159,7 @@ int task_create (task_t *task, void (*start_func)(void *), void *arg) {
     task->wakeTime = 0;
     
     // se a tarefa for o dispatcher nao coloca na fila
-    if (taskId == 1) {
+    if ((task != &dispatcherTask) && (task != &disk_manager_task)) {
         task->preemptable = 'N';
         return taskId;
     }
