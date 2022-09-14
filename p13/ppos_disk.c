@@ -11,9 +11,7 @@
 
 disk_t disk;
 task_t disk_manager_task;
-struct sigaction action;
-extern task_t *currTask;
-extern task_t *readyTasks;
+struct sigaction action_disk;
 
 
 static void diskDriverBody() {
@@ -34,7 +32,9 @@ static void diskDriverBody() {
     
         int status = disk_cmd(DISK_CMD_STATUS, 0, 0);
         // se o disco estiver livre e houver pedidos de E/S na fila
+        printf("STATUS = %d", status);
         if (status == 1 && (disk.request_queue != NULL)) {
+            printf("=-=-=-=-=-=-=-=-=-=-entrou no if status = 1\n");
             // escolhe na fila o pedido a ser atendido, usando FCFS
             req = disk.request_queue;
             // solicita ao disco a operação de E/S, usando disk_cmd()
@@ -66,7 +66,7 @@ static void sigusr_handler() {
 
 static request_t *create_request(int block, void *buffer, int request_op) {
 
-    request_t *new_req = malloc (sizeof (request_t));
+    request_t *new_req = malloc(sizeof(request_t));
     if (!new_req) 
         return 0;
 
@@ -101,14 +101,13 @@ int disk_mgr_init (int *numBlocks, int *blockSize) {
     disk.suspended_queue = NULL;
 
     task_create(&disk_manager_task, diskDriverBody, NULL);
-    queue_remove((queue_t **) &readyTasks, (queue_t *) &disk_manager_task);
     disk_manager_task.status = 'S';
 
     // registra o sinal de SIGUSR1
-    action.sa_handler = sigusr_handler;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
-    if (sigaction(SIGUSR1, &action, 0) < 0) {
+    action_disk.sa_handler = sigusr_handler;
+    sigemptyset(&action_disk.sa_mask);
+    action_disk.sa_flags = 0;
+    if (sigaction(SIGUSR1, &action_disk, 0) < 0) {
         perror("Sigaction error!");
         exit(1);
     }
@@ -118,9 +117,6 @@ int disk_mgr_init (int *numBlocks, int *blockSize) {
 
 // leitura de um bloco, do disco para o buffer
 int disk_block_read (int block, void *buffer) {
-
-    if (!buffer)
-        return -1;
 
     // obtém o semáforo de acesso ao disco
     sem_down(&disk.disk_access);    
