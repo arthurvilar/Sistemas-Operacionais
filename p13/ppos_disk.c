@@ -32,16 +32,14 @@ static void diskDriverBody() {
     
         int status = disk_cmd(DISK_CMD_STATUS, 0, 0);
         // se o disco estiver livre e houver pedidos de E/S na fila
-        printf("STATUS = %d", status);
         if (status == 1 && (disk.request_queue != NULL)) {
-            printf("=-=-=-=-=-=-=-=-=-=-entrou no if status = 1\n");
+            //printf("=-=-=-=-=-=-=-=-=-=-entrou no if status = 1\n");
+
             // escolhe na fila o pedido a ser atendido, usando FCFS
             req = disk.request_queue;
+
             // solicita ao disco a operação de E/S, usando disk_cmd()
-            if (req->op == 1) 
-                disk_cmd(DISK_CMD_READ, req->block, req->buffer);
-            else if (req->op == 2)
-                disk_cmd(DISK_CMD_WRITE, req->block, req->buffer);
+            disk_cmd(req->op, req->block, req->buffer);
         }
 
         // libera o semáforo de acesso ao disco
@@ -56,16 +54,20 @@ static void diskDriverBody() {
 }
 
 static void sigusr_handler() {
+    printf("SIGUSR_HANDLER: antes do if, status do disk_manager_task = %c\n", disk_manager_task.status);
     if (disk_manager_task.status == 'S') {
+        printf("SIGUSR_HANDLER: append do disk_manager_task em readyTasks\n");
         queue_append((queue_t **) &readyTasks, (queue_t *) &disk_manager_task);
         disk_manager_task.status = 'P';
     }
+    printf("SIGUSR_HANDLER: depois do if\n");
 
     disk.sinal = 1;
 }
 
 static request_t *create_request(int block, void *buffer, int request_op) {
 
+    //printf("CREATE_REQUEST: dentro da função\n");
     request_t *new_req = malloc(sizeof(request_t));
     if (!new_req) 
         return 0;
@@ -86,31 +88,42 @@ static request_t *create_request(int block, void *buffer, int request_op) {
 // blockSize: tamanho de cada bloco do disco, em bytes
 int disk_mgr_init (int *numBlocks, int *blockSize) {
 
+    printf("DISK_MGR_INIT: entrou no disk_mgr_init\n");
+
     // inicia o disco
-    if (disk_cmd(DISK_CMD_INIT, 0, 0))
+    if (disk_cmd(DISK_CMD_INIT, 0, 0) < 0)
         return -1;
+    printf("DISK_MGR_INIT: iniciou o disco\n");
 
     *numBlocks = disk_cmd(DISK_CMD_DISKSIZE, 0, 0);
     *blockSize = disk_cmd(DISK_CMD_BLOCKSIZE, 0, 0);
     if (*numBlocks < 0 || *blockSize < 0) 
         return -1;
+    printf("DISK_MGR_INIT: num de blocos e tamanho ok\n");
 
     sem_create(&disk.disk_access, 1);
+    printf("DISK_MGR_INIT: criou disk.sem\n");
+
     disk.sinal = 0;
     disk.request_queue = NULL;
     disk.suspended_queue = NULL;
 
     task_create(&disk_manager_task, diskDriverBody, NULL);
     disk_manager_task.status = 'S';
+    printf("DISK_MGR_INIT: criou disk_manager_task\n");
 
     // registra o sinal de SIGUSR1
+    printf("DISK_MGR_INIT: chamando sigusr_handler\n");
     action_disk.sa_handler = sigusr_handler;
+    printf("DISK_MGR_INIT: sigusr_handler acabou\n");
+
     sigemptyset(&action_disk.sa_mask);
     action_disk.sa_flags = 0;
     if (sigaction(SIGUSR1, &action_disk, 0) < 0) {
         perror("Sigaction error!");
         exit(1);
     }
+    printf("DISK_MGR_INIT: sigaction OK\n");
     
     return 0;
 }
@@ -122,6 +135,7 @@ int disk_block_read (int block, void *buffer) {
     sem_down(&disk.disk_access);    
     
     // cria nova requisição
+    //printf("DISK_BLOCK_READ: criando nova request\n");
     request_t *new_req = create_request(block, buffer, DISK_CMD_READ);
     if (!new_req)
         return -1;
@@ -139,11 +153,13 @@ int disk_block_read (int block, void *buffer) {
     sem_up(&disk.disk_access); 
     
     // suspende a tarefa corrente (retorna ao dispatcher) erro
-    printf("removendo task %d de readyTask\n", currTask->id);
+    printf("DISK_BLOCK_READ: removendo task %d de readyTask\n", currTask->id);
     queue_remove((queue_t **) &readyTasks, (queue_t *) currTask);
     currTask->status = 'S'; 
-    printf("colocando task %d na suspended queue\n", currTask->id);
+    printf("DISK_BLOCK_READ: colocando task %d na suspended queue\n", currTask->id);
     queue_append((queue_t **) &disk.suspended_queue, (queue_t *) currTask);
+
+    //task_yield(); // da errado se deixar ?
 
     return 0;
 }

@@ -71,7 +71,7 @@ int queue_append (queue_t **queue, queue_t *elem) {
 	
 	// checa se fila existe
 	if (queue == NULL) {
-		fprintf(stderr, "Fila não existe\n");
+		fprintf(stderr, "Append: Fila não existe\n");
 		return -1;
 	}
 
@@ -137,7 +137,7 @@ int queue_remove (queue_t **queue, queue_t *elem) {
 
 	// checa se fila existe
 	if (queue == NULL) {
-		fprintf(stderr, "Fila não existe\n");
+		fprintf(stderr, "Remove: Fila não existe\n");
 		return -1;
 	}
 
